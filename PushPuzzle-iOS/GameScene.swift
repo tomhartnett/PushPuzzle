@@ -25,6 +25,12 @@ class GameScene: SKScene {
     var allLevels: [Level] = []
     var currentLevelIndex = 0
 
+    // UI Buttons
+    var resetButton: SKLabelNode?
+    var prevButton: SKLabelNode?
+    var nextButton: SKLabelNode?
+    var levelTitleLabel: SKLabelNode?
+
     override func didMove(to view: SKView) {
         // Set scene size to match view
         size = view.bounds.size
@@ -34,7 +40,10 @@ class GameScene: SKScene {
         if let levels = try? loadLevels() {
             allLevels = levels.levels
             if !allLevels.isEmpty {
-                loadLevel(at: 0)
+                // Load persisted level or start at 0
+                let savedLevel = UserDefaults.standard.integer(forKey: "currentLevel")
+                let startLevel = savedLevel < allLevels.count ? savedLevel : 0
+                loadLevel(at: startLevel)
             }
         }
 
@@ -49,7 +58,19 @@ class GameScene: SKScene {
 
         currentLevelIndex = index
         level = allLevels[index]
+
+        // Save current level
+        UserDefaults.standard.set(index, forKey: "currentLevel")
+
         setupLevel(allLevels[index])
+        setupButtons()
+    }
+
+    func resetLevel() {
+        if let level = level {
+            setupLevel(level)
+            setupButtons()
+        }
     }
 
     func setupLevel(_ level: Level) {
@@ -131,6 +152,73 @@ class GameScene: SKScene {
         }
 
         return tile
+    }
+
+    func setupButtons() {
+        // Remove old buttons if they exist
+        resetButton?.removeFromParent()
+        prevButton?.removeFromParent()
+        nextButton?.removeFromParent()
+        levelTitleLabel?.removeFromParent()
+
+        // Position buttons below safe area (accounting for dynamic island)
+        let buttonY = size.height - 120
+
+        // Level title (above buttons)
+        let titleY = size.height - 80
+        levelTitleLabel = SKLabelNode(text: level?.name ?? "")
+        levelTitleLabel?.fontSize = 28
+        levelTitleLabel?.fontName = "Helvetica-Bold"
+        levelTitleLabel?.fontColor = .white
+        levelTitleLabel?.position = CGPoint(x: size.width / 2, y: titleY)
+        levelTitleLabel?.zPosition = 100
+        addChild(levelTitleLabel!)
+
+        // Reset button (center)
+        resetButton = SKLabelNode(text: "Reset")
+        resetButton?.fontSize = 20
+        resetButton?.fontName = "Helvetica-Bold"
+        resetButton?.fontColor = .white
+        resetButton?.position = CGPoint(x: size.width / 2, y: buttonY)
+        resetButton?.name = "resetButton"
+        resetButton?.zPosition = 100
+        addChild(resetButton!)
+
+        // Previous button (left)
+        prevButton = SKLabelNode(text: "< Prev")
+        prevButton?.fontSize = 20
+        prevButton?.fontName = "Helvetica-Bold"
+        prevButton?.fontColor = currentLevelIndex > 0 ? .white : .gray
+        prevButton?.position = CGPoint(x: 60, y: buttonY)
+        prevButton?.name = "prevButton"
+        prevButton?.zPosition = 100
+        addChild(prevButton!)
+
+        // Next button (right)
+        nextButton = SKLabelNode(text: "Next >")
+        nextButton?.fontSize = 20
+        nextButton?.fontName = "Helvetica-Bold"
+        nextButton?.fontColor = currentLevelIndex < allLevels.count - 1 ? .white : .gray
+        nextButton?.position = CGPoint(x: size.width - 60, y: buttonY)
+        nextButton?.name = "nextButton"
+        nextButton?.zPosition = 100
+        addChild(nextButton!)
+    }
+
+    override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
+        guard let touch = touches.first else { return }
+        let location = touch.location(in: self)
+        let touchedNodes = nodes(at: location)
+
+        for node in touchedNodes {
+            if node.name == "resetButton" {
+                resetLevel()
+            } else if node.name == "prevButton" && currentLevelIndex > 0 {
+                loadLevel(at: currentLevelIndex - 1)
+            } else if node.name == "nextButton" && currentLevelIndex < allLevels.count - 1 {
+                loadLevel(at: currentLevelIndex + 1)
+            }
+        }
     }
 
     func setupGestureRecognizers(view: SKView) {

@@ -13,11 +13,13 @@ struct AllLevels: Codable {
 
 struct Level: Codable, Identifiable {
     let id: UUID
+    let name: String
     let rows: [[Int]]
 
     init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         self.id = UUID()
+        self.name = try container.decode(String.self, forKey: .name)
         self.rows = try container.decode([[Int]].self, forKey: .rows)
     }
 }
