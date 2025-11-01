@@ -8,7 +8,7 @@
 import SpriteKit
 
 class GameScene: SKScene {
-    let tileSize: CGFloat = 48
+    var tileSize: CGFloat = 48
 
     var level: Level?
     var playerNode: SKSpriteNode?
@@ -21,20 +21,35 @@ class GameScene: SKScene {
     var boardStartX: CGFloat = 0
     var boardStartY: CGFloat = 0
 
+    // Level management
+    var allLevels: [Level] = []
+    var currentLevelIndex = 0
+
     override func didMove(to view: SKView) {
         // Set scene size to match view
         size = view.bounds.size
         backgroundColor = .black
 
-        // Load first level
-        if let allLevels = try? loadLevels(),
-           let firstLevel = allLevels.levels.first {
-            self.level = firstLevel
-            setupLevel(firstLevel)
+        // Load all levels
+        if let levels = try? loadLevels() {
+            allLevels = levels.levels
+            if !allLevels.isEmpty {
+                loadLevel(at: 0)
+            }
         }
 
         // Setup swipe gestures
         setupGestureRecognizers(view: view)
+    }
+
+    func loadLevel(at index: Int) {
+        guard index >= 0 && index < allLevels.count else {
+            return
+        }
+
+        currentLevelIndex = index
+        level = allLevels[index]
+        setupLevel(allLevels[index])
     }
 
     func setupLevel(_ level: Level) {
@@ -46,6 +61,17 @@ class GameScene: SKScene {
         let rows = level.rows
         let rowCount = rows.count
         let columnCount = rows.first?.count ?? 0
+
+        // Calculate tile size to fit the screen with padding
+        let padding: CGFloat = 40
+        let availableWidth = size.width - padding * 2
+        let availableHeight = size.height - padding * 2
+
+        let tileSizeForWidth = availableWidth / CGFloat(columnCount)
+        let tileSizeForHeight = availableHeight / CGFloat(rowCount)
+
+        // Use the smaller of the two to ensure everything fits
+        tileSize = min(tileSizeForWidth, tileSizeForHeight)
 
         // Calculate board size and position
         let boardWidth = CGFloat(columnCount) * tileSize
@@ -97,7 +123,8 @@ class GameScene: SKScene {
 
         if !text.isEmpty {
             let label = SKLabelNode(text: text)
-            label.fontSize = 32
+            // Scale font size based on tile size (about 2/3 of tile size)
+            label.fontSize = tileSize * 0.67
             label.verticalAlignmentMode = .center
             label.horizontalAlignmentMode = .center
             tile.addChild(label)
@@ -223,9 +250,29 @@ class GameScene: SKScene {
             label.zPosition = 100
             addChild(label)
 
-            // Fade in effect
+            // Fade in effect, then load next level
             label.alpha = 0
-            label.run(SKAction.fadeIn(withDuration: 0.5))
+            let fadeIn = SKAction.fadeIn(withDuration: 0.5)
+            let wait = SKAction.wait(forDuration: 1.0)
+            let loadNext = SKAction.run { [weak self] in
+                self?.loadNextLevel()
+            }
+            label.run(SKAction.sequence([fadeIn, wait, loadNext]))
+        }
+    }
+
+    func loadNextLevel() {
+        let nextIndex = currentLevelIndex + 1
+        if nextIndex < allLevels.count {
+            loadLevel(at: nextIndex)
+        } else {
+            // All levels complete
+            let label = SKLabelNode(text: "All Levels Complete!")
+            label.fontSize = 48
+            label.fontColor = .yellow
+            label.position = CGPoint(x: size.width / 2, y: size.height / 2)
+            label.zPosition = 100
+            addChild(label)
         }
     }
 }
