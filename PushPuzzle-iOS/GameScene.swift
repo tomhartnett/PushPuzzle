@@ -30,6 +30,7 @@ class GameScene: SKScene {
     var prevButton: SKLabelNode?
     var nextButton: SKLabelNode?
     var levelTitleLabel: SKLabelNode?
+    var completionCountLabel: SKLabelNode?
 
     override func didMove(to view: SKView) {
         // Set scene size to match view
@@ -160,12 +161,14 @@ class GameScene: SKScene {
         prevButton?.removeFromParent()
         nextButton?.removeFromParent()
         levelTitleLabel?.removeFromParent()
+        completionCountLabel?.removeFromParent()
 
-        // Position buttons below safe area (accounting for dynamic island)
-        let buttonY = size.height - 120
+        // Position UI at top with safe spacing below dynamic island
+        // Dynamic island is about 37pt tall, so start at least 60pt from top
+        let buttonY: CGFloat = size.height - 140
 
-        // Level title (above buttons)
-        let titleY = size.height - 80
+        // Level title (highest element)
+        let titleY: CGFloat = size.height - 70
         levelTitleLabel = SKLabelNode(text: level?.name ?? "")
         levelTitleLabel?.fontSize = 28
         levelTitleLabel?.fontName = "Helvetica-Bold"
@@ -173,6 +176,18 @@ class GameScene: SKScene {
         levelTitleLabel?.position = CGPoint(x: size.width / 2, y: titleY)
         levelTitleLabel?.zPosition = 100
         addChild(levelTitleLabel!)
+
+        // Completion count (below level title)
+        let completionY: CGFloat = size.height - 100
+        let completionCount = getCompletionCount(for: currentLevelIndex)
+        let completionText = completionCount == 1 ? "Completed 1 time" : "Completed \(completionCount) times"
+        completionCountLabel = SKLabelNode(text: completionText)
+        completionCountLabel?.fontSize = 16
+        completionCountLabel?.fontName = "Helvetica-Bold"
+        completionCountLabel?.fontColor = .lightGray
+        completionCountLabel?.position = CGPoint(x: size.width / 2, y: completionY)
+        completionCountLabel?.zPosition = 100
+        addChild(completionCountLabel!)
 
         // Reset button (center)
         resetButton = SKLabelNode(text: "Reset")
@@ -325,11 +340,25 @@ class GameScene: SKScene {
         return CGPoint(x: posX, y: posY)
     }
 
+    func getCompletionCount(for levelIndex: Int) -> Int {
+        let key = "level_\(levelIndex)_completions"
+        return UserDefaults.standard.integer(forKey: key)
+    }
+
+    func incrementCompletionCount(for levelIndex: Int) {
+        let key = "level_\(levelIndex)_completions"
+        let currentCount = UserDefaults.standard.integer(forKey: key)
+        UserDefaults.standard.set(currentCount + 1, forKey: key)
+    }
+
     func checkWinCondition() {
         // Check if all diamonds are on targets
         let diamondPositions = Set(diamondNodes.keys)
 
         if diamondPositions == targetPositions {
+            // Increment completion count for this level
+            incrementCompletionCount(for: currentLevelIndex)
+
             // Level complete!
             let label = SKLabelNode(text: "Level Complete!")
             label.fontSize = 48
