@@ -1,4 +1,5 @@
 {
+    "description": "This file is not in use. Found these maps on GitHub. https://github.com/pikacccc/PushPuzzle. Not 100% certain they're all beatable, so switched to `sokoban-maps-60-plain.txt` instead.",
     "levels": [
         {
             "name": "Level 1",

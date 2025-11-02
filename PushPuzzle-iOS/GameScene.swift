@@ -117,7 +117,7 @@ class GameScene: SKScene {
                     addChild(wall)
 
                 case 2: // Target (floor or target tile)
-                    let target = createTile(at: position, color: .clear, text: "⬜️")
+                    let target = createTile(at: position, color: .clear, text: "🅇")
                     addChild(target)
                     targetPositions.insert("\(colIndex),\(rowIndex)")
 
@@ -130,15 +130,6 @@ class GameScene: SKScene {
                     playerNode = createTile(at: position, color: .clear, text: "🚜", zPosition: 10)
                     addChild(playerNode!)
                     playerGridPosition = (x: colIndex, y: rowIndex)
-
-                case 5: // Box already on target
-                    let target = createTile(at: position, color: .clear, text: "⬜️")
-                    addChild(target)
-                    targetPositions.insert("\(colIndex),\(rowIndex)")
-
-                    let box = createTile(at: position, color: .clear, text: "📦", zPosition: 5)
-                    addChild(box)
-                    boxNodes["\(colIndex),\(rowIndex)"] = box
 
                 default:
                     break
@@ -174,10 +165,10 @@ class GameScene: SKScene {
 
         // Position UI at top with safe spacing below dynamic island
         // Dynamic island is about 37pt tall, so start at least 60pt from top
-        let buttonY: CGFloat = size.height - 140
+        let buttonY: CGFloat = size.height - 150
 
         // Level title (highest element)
-        let titleY: CGFloat = size.height - 70
+        let titleY: CGFloat = size.height - 80
         levelTitleLabel = SKLabelNode(text: level?.name ?? "")
         levelTitleLabel?.fontSize = 28
         levelTitleLabel?.fontName = "Helvetica-Bold"
@@ -187,7 +178,7 @@ class GameScene: SKScene {
         addChild(levelTitleLabel!)
 
         // Completion count (below level title)
-        let completionY: CGFloat = size.height - 100
+        let completionY: CGFloat = size.height - 110
         let completionCount = getCompletionCount(for: currentLevelIndex)
         let completionText = completionCount == 1 ? "Completed 1 time" : "Completed \(completionCount) times"
         completionCountLabel = SKLabelNode(text: completionText)
