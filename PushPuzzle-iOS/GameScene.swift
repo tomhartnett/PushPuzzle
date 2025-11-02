@@ -14,8 +14,8 @@ class GameScene: SKScene {
     var playerNode: SKSpriteNode?
     var playerGridPosition = (x: 0, y: 0)
 
-    // Track diamonds and targets
-    var diamondNodes: [String: SKSpriteNode] = [:] // Key: "x,y"
+    // Track boxes and targets
+    var boxNodes: [String: SKSpriteNode] = [:] // Key: "x,y"
     var targetPositions: Set<String> = [] // Set of "x,y" for target tiles
 
     var boardStartX: CGFloat = 0
@@ -77,7 +77,7 @@ class GameScene: SKScene {
     func setupLevel(_ level: Level) {
         // Clear existing nodes
         removeAllChildren()
-        diamondNodes.removeAll()
+        boxNodes.removeAll()
         targetPositions.removeAll()
 
         let rows = level.rows
@@ -113,23 +113,32 @@ class GameScene: SKScene {
                     break
 
                 case 1: // Wall
-                    let wall = createTile(at: position, color: .gray, text: "🪨")
+                    let wall = createTile(at: position, color: .clear, text: "🟫")
                     addChild(wall)
 
-                case 2, 5: // Target (floor or target tile)
-                    let target = createTile(at: position, color: .lightGray, text: "🔳")
+                case 2: // Target (floor or target tile)
+                    let target = createTile(at: position, color: .clear, text: "⬜️")
                     addChild(target)
                     targetPositions.insert("\(colIndex),\(rowIndex)")
 
-                case 3: // Diamond
-                    let diamond = createTile(at: position, color: .clear, text: "💎", zPosition: 5)
-                    addChild(diamond)
-                    diamondNodes["\(colIndex),\(rowIndex)"] = diamond
+                case 3: // Box
+                    let box = createTile(at: position, color: .clear, text: "📦", zPosition: 5)
+                    addChild(box)
+                    boxNodes["\(colIndex),\(rowIndex)"] = box
 
                 case 4: // Player
-                    playerNode = createTile(at: position, color: .clear, text: "👴🏻", zPosition: 10)
+                    playerNode = createTile(at: position, color: .clear, text: "🚜", zPosition: 10)
                     addChild(playerNode!)
                     playerGridPosition = (x: colIndex, y: rowIndex)
+
+                case 5: // Box already on target
+                    let target = createTile(at: position, color: .clear, text: "⬜️")
+                    addChild(target)
+                    targetPositions.insert("\(colIndex),\(rowIndex)")
+
+                    let box = createTile(at: position, color: .clear, text: "📦", zPosition: 5)
+                    addChild(box)
+                    boxNodes["\(colIndex),\(rowIndex)"] = box
 
                 default:
                     break
@@ -146,7 +155,7 @@ class GameScene: SKScene {
         if !text.isEmpty {
             let label = SKLabelNode(text: text)
             // Scale font size based on tile size (about 2/3 of tile size)
-            label.fontSize = tileSize * 0.67
+            label.fontSize = tileSize * 0.90
             label.verticalAlignmentMode = .center
             label.horizontalAlignmentMode = .center
             tile.addChild(label)
@@ -290,35 +299,35 @@ class GameScene: SKScene {
             return
         }
 
-        // Check if there's a diamond at target position (check current state, not initial level data)
-        if diamondNodes[targetKey] != nil {
-            // Try to push the diamond
-            let diamondNewX = newX + dx
-            let diamondNewY = newY + dy
+        // Check if there's a box at target position (check current state, not initial level data)
+        if boxNodes[targetKey] != nil {
+            // Try to push the box
+            let boxNewX = newX + dx
+            let boxNewY = newY + dy
 
-            // Check bounds for diamond's new position
-            guard diamondNewY >= 0 && diamondNewY < level.rows.count &&
-                  diamondNewX >= 0 && diamondNewX < level.rows[diamondNewY].count else {
+            // Check bounds for box's new position
+            guard boxNewY >= 0 && boxNewY < level.rows.count &&
+                  boxNewX >= 0 && boxNewX < level.rows[boxNewY].count else {
                 return
             }
 
-            let diamondTargetTile = level.rows[diamondNewY][diamondNewX]
-            let diamondNewKey = "\(diamondNewX),\(diamondNewY)"
+            let boxTargetTile = level.rows[boxNewY][boxNewX]
+            let boxNewKey = "\(boxNewX),\(boxNewY)"
 
-            // Diamond can move anywhere except walls (1) and other diamonds
-            guard diamondTargetTile != 1 && diamondNodes[diamondNewKey] == nil else {
+            // Box can move anywhere except walls (1) and other boxes
+            guard boxTargetTile != 1 && boxNodes[boxNewKey] == nil else {
                 return
             }
 
-            // Push the diamond
-            if let diamond = diamondNodes[targetKey] {
-                let newDiamondPos = gridToPosition(x: diamondNewX, y: diamondNewY)
-                let moveAction = SKAction.move(to: newDiamondPos, duration: 0.15)
-                diamond.run(moveAction)
+            // Push the box
+            if let box = boxNodes[targetKey] {
+                let newBoxPos = gridToPosition(x: boxNewX, y: boxNewY)
+                let moveAction = SKAction.move(to: newBoxPos, duration: 0.15)
+                box.run(moveAction)
 
-                // Update diamond tracking
-                diamondNodes.removeValue(forKey: targetKey)
-                diamondNodes[diamondNewKey] = diamond
+                // Update box tracking
+                boxNodes.removeValue(forKey: targetKey)
+                boxNodes[boxNewKey] = box
             }
         }
 
@@ -352,10 +361,10 @@ class GameScene: SKScene {
     }
 
     func checkWinCondition() {
-        // Check if all diamonds are on targets
-        let diamondPositions = Set(diamondNodes.keys)
+        // Check if all boxes are on targets
+        let boxPositions = Set(boxNodes.keys)
 
-        if diamondPositions == targetPositions {
+        if boxPositions == targetPositions {
             // Increment completion count for this level
             incrementCompletionCount(for: currentLevelIndex)
 
