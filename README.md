@@ -1,5 +1,5 @@
 # PushPuzzle
-A [Sokoban](https://en.wikipedia.org/wiki/Sokoban) style puzzle game. Push boxes to their targets to complete a level. But be careful! You can't _pull_ a box, so if one wrong move and you can't beat the level.
+A [Sokoban](https://en.wikipedia.org/wiki/Sokoban) style puzzle game. Push boxes to their targets to complete a level. But be careful! You can't _pull_ a box, so one wrong move means you can't beat the level.
 
 *This app was almost entirely "vibe-coded" with Claude Code*
 
