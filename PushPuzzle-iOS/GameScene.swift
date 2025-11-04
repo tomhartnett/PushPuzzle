@@ -27,10 +27,23 @@ class GameScene: SKScene {
 
     // UI Buttons
     var resetButton: SKLabelNode?
+    var undoButton: SKLabelNode?
     var prevButton: SKLabelNode?
     var nextButton: SKLabelNode?
     var levelTitleLabel: SKLabelNode?
     var completionCountLabel: SKLabelNode?
+
+    // Auto-navigation
+    var autoNavigationPath: [(x: Int, y: Int)] = []
+    var isAutoNavigating = false
+
+    // Move history for undo
+    struct MoveState {
+        let playerPosition: (x: Int, y: Int)
+        let boxFrom: (x: Int, y: Int)?
+        let boxTo: (x: Int, y: Int)?
+    }
+    var moveHistory: [MoveState] = []
 
     override func didMove(to view: SKView) {
         // Set scene size to match view
@@ -68,6 +81,13 @@ class GameScene: SKScene {
     }
 
     func resetLevel() {
+        // Cancel any ongoing auto-navigation
+        isAutoNavigating = false
+        autoNavigationPath.removeAll()
+
+        // Clear move history
+        moveHistory.removeAll()
+
         if let level = level {
             setupLevel(level)
             setupButtons()
@@ -79,6 +99,13 @@ class GameScene: SKScene {
         removeAllChildren()
         boxNodes.removeAll()
         targetPositions.removeAll()
+
+        // Cancel any ongoing auto-navigation
+        isAutoNavigating = false
+        autoNavigationPath.removeAll()
+
+        // Clear move history
+        moveHistory.removeAll()
 
         let rows = level.rows
         let rowCount = rows.count
@@ -158,6 +185,7 @@ class GameScene: SKScene {
     func setupButtons() {
         // Remove old buttons if they exist
         resetButton?.removeFromParent()
+        undoButton?.removeFromParent()
         prevButton?.removeFromParent()
         nextButton?.removeFromParent()
         levelTitleLabel?.removeFromParent()
@@ -189,12 +217,22 @@ class GameScene: SKScene {
         completionCountLabel?.zPosition = 100
         addChild(completionCountLabel!)
 
-        // Reset button (center)
+        // Undo button (center-left)
+        undoButton = SKLabelNode(text: "Undo")
+        undoButton?.fontSize = 20
+        undoButton?.fontName = "Helvetica-Bold"
+        undoButton?.fontColor = !moveHistory.isEmpty ? .white : .gray
+        undoButton?.position = CGPoint(x: size.width / 2 - 70, y: buttonY)
+        undoButton?.name = "undoButton"
+        undoButton?.zPosition = 100
+        addChild(undoButton!)
+
+        // Reset button (center-right)
         resetButton = SKLabelNode(text: "Reset")
         resetButton?.fontSize = 20
         resetButton?.fontName = "Helvetica-Bold"
         resetButton?.fontColor = .white
-        resetButton?.position = CGPoint(x: size.width / 2, y: buttonY)
+        resetButton?.position = CGPoint(x: size.width / 2 + 70, y: buttonY)
         resetButton?.name = "resetButton"
         resetButton?.zPosition = 100
         addChild(resetButton!)
@@ -226,7 +264,9 @@ class GameScene: SKScene {
         let touchedNodes = nodes(at: location)
 
         for node in touchedNodes {
-            if node.name == "resetButton" {
+            if node.name == "undoButton" && !moveHistory.isEmpty {
+                undoLastMove()
+            } else if node.name == "resetButton" {
                 resetLevel()
             } else if node.name == "prevButton" && currentLevelIndex > 0 {
                 loadLevel(at: currentLevelIndex - 1)
@@ -253,6 +293,11 @@ class GameScene: SKScene {
         let swipeRight = UISwipeGestureRecognizer(target: self, action: #selector(handleSwipe(_:)))
         swipeRight.direction = .right
         view.addGestureRecognizer(swipeRight)
+
+        // Long-press gesture for auto-navigation
+        let longPress = UILongPressGestureRecognizer(target: self, action: #selector(handleLongPress(_:)))
+        longPress.minimumPressDuration = 0.5
+        view.addGestureRecognizer(longPress)
     }
 
     @objc func handleSwipe(_ gesture: UISwipeGestureRecognizer) {
@@ -273,6 +318,12 @@ class GameScene: SKScene {
     func movePlayer(dx: Int, dy: Int) {
         guard let level = level else { return }
 
+        // Cancel auto-navigation if manually moving
+        if isAutoNavigating {
+            isAutoNavigating = false
+            autoNavigationPath.removeAll()
+        }
+
         let newX = playerGridPosition.x + dx
         let newY = playerGridPosition.y + dy
 
@@ -289,6 +340,10 @@ class GameScene: SKScene {
         guard targetTile != 1 else {
             return
         }
+
+        // Prepare move state for undo
+        var boxFromPos: (x: Int, y: Int)? = nil
+        var boxToPos: (x: Int, y: Int)? = nil
 
         // Check if there's a box at target position (check current state, not initial level data)
         if boxNodes[targetKey] != nil {
@@ -310,6 +365,10 @@ class GameScene: SKScene {
                 return
             }
 
+            // Record box movement for undo
+            boxFromPos = (x: newX, y: newY)
+            boxToPos = (x: boxNewX, y: boxNewY)
+
             // Push the box
             if let box = boxNodes[targetKey] {
                 let newBoxPos = gridToPosition(x: boxNewX, y: boxNewY)
@@ -322,6 +381,14 @@ class GameScene: SKScene {
             }
         }
 
+        // Save state to history (before updating player position)
+        let moveState = MoveState(
+            playerPosition: playerGridPosition,
+            boxFrom: boxFromPos,
+            boxTo: boxToPos
+        )
+        moveHistory.append(moveState)
+
         // Move player
         let newPlayerPos = gridToPosition(x: newX, y: newY)
         let moveAction = SKAction.move(to: newPlayerPos, duration: 0.15)
@@ -329,6 +396,9 @@ class GameScene: SKScene {
 
         // Update player position
         playerGridPosition = (x: newX, y: newY)
+
+        // Update undo button state
+        undoButton?.fontColor = !moveHistory.isEmpty ? .white : .gray
 
         // Check win condition
         checkWinCondition()
@@ -390,6 +460,177 @@ class GameScene: SKScene {
             label.position = CGPoint(x: size.width / 2, y: size.height / 2)
             label.zPosition = 100
             addChild(label)
+        }
+    }
+
+    // MARK: - Undo
+
+    func undoLastMove() {
+        guard !moveHistory.isEmpty else { return }
+
+        // Cancel any ongoing auto-navigation
+        isAutoNavigating = false
+        autoNavigationPath.removeAll()
+
+        // Get the last state
+        let lastState = moveHistory.removeLast()
+
+        // Restore box position if a box was moved
+        if let boxFrom = lastState.boxFrom, let boxTo = lastState.boxTo {
+            let boxToKey = "\(boxTo.x),\(boxTo.y)"
+            let boxFromKey = "\(boxFrom.x),\(boxFrom.y)"
+
+            // Move the box back
+            if let box = boxNodes[boxToKey] {
+                let oldBoxPos = gridToPosition(x: boxFrom.x, y: boxFrom.y)
+                let moveAction = SKAction.move(to: oldBoxPos, duration: 0.15)
+                box.run(moveAction)
+
+                // Update box tracking
+                boxNodes.removeValue(forKey: boxToKey)
+                boxNodes[boxFromKey] = box
+            }
+        }
+
+        // Restore player position
+        let oldPlayerPos = gridToPosition(x: lastState.playerPosition.x, y: lastState.playerPosition.y)
+        let moveAction = SKAction.move(to: oldPlayerPos, duration: 0.15)
+        playerNode?.run(moveAction)
+
+        // Update player position
+        playerGridPosition = lastState.playerPosition
+
+        // Update undo button color
+        undoButton?.fontColor = !moveHistory.isEmpty ? .white : .gray
+    }
+
+    // MARK: - Auto-navigation
+
+    @objc func handleLongPress(_ gesture: UILongPressGestureRecognizer) {
+        guard gesture.state == .began else { return }
+        guard !isAutoNavigating else { return }
+
+        let location = gesture.location(in: gesture.view)
+        guard let gridPos = positionToGrid(point: location) else { return }
+
+        // Find path and start auto-navigation
+        if let path = findPath(from: playerGridPosition, to: gridPos) {
+            autoNavigationPath = path
+            isAutoNavigating = true
+            moveAlongPath()
+        }
+    }
+
+    func positionToGrid(point: CGPoint) -> (x: Int, y: Int)? {
+        guard let level = level else { return nil }
+
+        // Convert view coordinates to scene coordinates
+        guard let view = self.view else { return nil }
+        let scenePoint = convertPoint(fromView: point)
+
+        // Calculate grid position
+        let relativeX = scenePoint.x - boardStartX
+        let relativeY = size.height - scenePoint.y - boardStartY
+
+        let gridX = Int(relativeX / tileSize)
+        let gridY = Int(relativeY / tileSize)
+
+        // Validate bounds
+        guard gridY >= 0 && gridY < level.rows.count &&
+              gridX >= 0 && gridX < level.rows[gridY].count else {
+            return nil
+        }
+
+        return (x: gridX, y: gridY)
+    }
+
+    func findPath(from start: (x: Int, y: Int), to end: (x: Int, y: Int)) -> [(x: Int, y: Int)]? {
+        guard let level = level else { return nil }
+
+        // Check if target is walkable
+        let targetTile = level.rows[end.y][end.x]
+        let targetKey = "\(end.x),\(end.y)"
+
+        // Can't navigate to walls or boxes
+        guard targetTile != 1 && boxNodes[targetKey] == nil else {
+            return nil
+        }
+
+        // BFS pathfinding
+        var queue: [(pos: (x: Int, y: Int), path: [(x: Int, y: Int)])] = [(start, [])]
+        var visited = Set<String>()
+        visited.insert("\(start.x),\(start.y)")
+
+        let directions = [(0, -1), (0, 1), (-1, 0), (1, 0)] // up, down, left, right
+
+        while !queue.isEmpty {
+            let current = queue.removeFirst()
+            let pos = current.pos
+            let path = current.path
+
+            // Check if we reached the goal
+            if pos.x == end.x && pos.y == end.y {
+                return path
+            }
+
+            // Explore neighbors
+            for dir in directions {
+                let newX = pos.x + dir.0
+                let newY = pos.y + dir.1
+                let key = "\(newX),\(newY)"
+
+                // Check bounds
+                guard newY >= 0 && newY < level.rows.count &&
+                      newX >= 0 && newX < level.rows[newY].count else {
+                    continue
+                }
+
+                // Skip if already visited
+                guard !visited.contains(key) else {
+                    continue
+                }
+
+                let tile = level.rows[newY][newX]
+
+                // Can only walk on empty tiles (not walls, not boxes)
+                guard tile != 1 && boxNodes[key] == nil else {
+                    continue
+                }
+
+                visited.insert(key)
+                var newPath = path
+                newPath.append((x: newX, y: newY))
+                queue.append(((x: newX, y: newY), newPath))
+            }
+        }
+
+        return nil // No path found
+    }
+
+    func moveAlongPath() {
+        guard !autoNavigationPath.isEmpty else {
+            isAutoNavigating = false
+            return
+        }
+
+        let nextPos = autoNavigationPath.removeFirst()
+        let dx = nextPos.x - playerGridPosition.x
+        let dy = nextPos.y - playerGridPosition.y
+
+        // Move player
+        let newPlayerPos = gridToPosition(x: nextPos.x, y: nextPos.y)
+        let moveAction = SKAction.move(to: newPlayerPos, duration: 0.15)
+
+        playerNode?.run(moveAction) { [weak self] in
+            guard let self = self else { return }
+
+            // Update player position
+            self.playerGridPosition = nextPos
+
+            // Continue moving along path
+            if self.isAutoNavigating {
+                self.moveAlongPath()
+            }
         }
     }
 }
