@@ -32,6 +32,15 @@ class GameViewController: UIViewController {
         skView.showsNodeCount = true
     }
 
+    override func viewWillLayoutSubviews() {
+        super.viewWillLayoutSubviews()
+
+        // Handle rotation by updating the scene size and re-rendering
+        if gameScene.size != view.bounds.size {
+            gameScene.handleOrientationChange(newSize: view.bounds.size)
+        }
+    }
+
     override var prefersStatusBarHidden: Bool {
         return true
     }

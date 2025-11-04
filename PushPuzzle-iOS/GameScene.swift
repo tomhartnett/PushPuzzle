@@ -633,4 +633,148 @@ class GameScene: SKScene {
             }
         }
     }
+
+    // MARK: - Orientation Handling
+
+    struct GameState {
+        let playerPosition: (x: Int, y: Int)
+        let boxPositions: [(x: Int, y: Int)]
+        let moveHistory: [MoveState]
+        let isAutoNavigating: Bool
+        let autoNavigationPath: [(x: Int, y: Int)]
+    }
+
+    func saveGameState() -> GameState {
+        // Convert boxNodes dictionary to array of positions
+        let boxPositions = boxNodes.keys.compactMap { key -> (x: Int, y: Int)? in
+            let components = key.split(separator: ",")
+            guard components.count == 2,
+                  let x = Int(components[0]),
+                  let y = Int(components[1]) else {
+                return nil
+            }
+            return (x: x, y: y)
+        }
+
+        return GameState(
+            playerPosition: playerGridPosition,
+            boxPositions: boxPositions,
+            moveHistory: moveHistory,
+            isAutoNavigating: isAutoNavigating,
+            autoNavigationPath: autoNavigationPath
+        )
+    }
+
+    func handleOrientationChange(newSize: CGSize) {
+        guard let level = level else { return }
+
+        // Save current game state
+        let savedState = saveGameState()
+
+        // Update scene size
+        size = newSize
+
+        // Recalculate layout without recreating nodes
+        recalculateLayout()
+
+        // Restore move history and navigation state
+        moveHistory = savedState.moveHistory
+        isAutoNavigating = savedState.isAutoNavigating
+        autoNavigationPath = savedState.autoNavigationPath
+
+        // Restore buttons
+        setupButtons()
+    }
+
+    func recalculateLayout() {
+        guard let level = level else { return }
+
+        let rows = level.rows
+        let rowCount = rows.count
+        let columnCount = rows.first?.count ?? 0
+
+        // Recalculate tile size to fit the screen with padding
+        let padding: CGFloat = 40
+        let availableWidth = size.width - padding * 2
+        let availableHeight = size.height - padding * 2
+
+        let tileSizeForWidth = availableWidth / CGFloat(columnCount)
+        let tileSizeForHeight = availableHeight / CGFloat(rowCount)
+
+        // Use the smaller of the two to ensure everything fits
+        tileSize = min(tileSizeForWidth, tileSizeForHeight)
+
+        // Calculate board size and position
+        let boardWidth = CGFloat(columnCount) * tileSize
+        let boardHeight = CGFloat(rowCount) * tileSize
+        boardStartX = (size.width - boardWidth) / 2
+        boardStartY = (size.height - boardHeight) / 2
+
+        // Remove and recreate static tiles (walls and targets)
+        // Collect nodes to remove
+        var nodesToRemove: [SKNode] = []
+        for node in children {
+            guard let sprite = node as? SKSpriteNode,
+                  let label = sprite.children.first as? SKLabelNode else {
+                continue
+            }
+
+            // Remove walls and targets (but not player or boxes or buttons)
+            if label.text == "🟫" || label.text == "🅇" {
+                nodesToRemove.append(sprite)
+            }
+        }
+
+        // Remove the collected nodes
+        for node in nodesToRemove {
+            node.removeFromParent()
+        }
+
+        // Recreate static tiles
+        for (rowIndex, row) in rows.enumerated() {
+            for (colIndex, tileType) in row.enumerated() {
+                let x = boardStartX + CGFloat(colIndex) * tileSize + tileSize / 2
+                let y = size.height - (boardStartY + CGFloat(rowIndex) * tileSize + tileSize / 2)
+                let position = CGPoint(x: x, y: y)
+
+                switch tileType {
+                case 1: // Wall
+                    let wall = createTile(at: position, color: .clear, text: "🟫")
+                    addChild(wall)
+
+                case 2: // Target
+                    let target = createTile(at: position, color: .clear, text: "🅇")
+                    addChild(target)
+
+                default:
+                    break
+                }
+            }
+        }
+
+        // Reposition player
+        if let player = playerNode {
+            player.position = gridToPosition(x: playerGridPosition.x, y: playerGridPosition.y)
+            player.size = CGSize(width: tileSize - 2, height: tileSize - 2)
+            // Update emoji size
+            if let label = player.children.first as? SKLabelNode {
+                label.fontSize = tileSize * 0.90
+            }
+        }
+
+        // Reposition all boxes
+        for (key, box) in boxNodes {
+            let components = key.split(separator: ",")
+            if components.count == 2,
+               let x = Int(components[0]),
+               let y = Int(components[1]) {
+                box.position = gridToPosition(x: x, y: y)
+                box.size = CGSize(width: tileSize - 2, height: tileSize - 2)
+                // Update emoji size
+                if let label = box.children.first as? SKLabelNode {
+                    label.fontSize = tileSize * 0.90
+                }
+            }
+        }
+    }
 }
