@@ -47,6 +47,15 @@ class GameScene: SKScene {
     }
     var moveHistory: [MoveState] = []
 
+    // Persistent game state
+    struct PersistentGameState: Codable {
+        let playerX: Int
+        let playerY: Int
+        let playerRotation: Double
+        let playerXScale: Double
+        let boxPositions: [[Int]] // Array of [x, y] pairs
+    }
+
     override func didMove(to view: SKView) {
         // Set scene size to match view
         size = view.bounds.size
@@ -65,11 +74,32 @@ class GameScene: SKScene {
 
         // Setup swipe gestures
         setupGestureRecognizers(view: view)
+
+        // Observe app backgrounding to save progress
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(appDidEnterBackground),
+            name: UIApplication.didEnterBackgroundNotification,
+            object: nil
+        )
+    }
+
+    @objc func appDidEnterBackground() {
+        saveGameProgress()
+    }
+
+    deinit {
+        NotificationCenter.default.removeObserver(self)
     }
 
     func loadLevel(at index: Int) {
         guard index >= 0 && index < allLevels.count else {
             return
+        }
+
+        // Save progress for current level before switching
+        if index != currentLevelIndex {
+            saveGameProgress()
         }
 
         currentLevelIndex = index
@@ -89,6 +119,9 @@ class GameScene: SKScene {
 
         // Clear move history
         moveHistory.removeAll()
+
+        // Clear saved progress for this level
+        clearGameProgress(for: currentLevelIndex)
 
         if let level = level {
             setupLevel(level)
@@ -164,6 +197,32 @@ class GameScene: SKScene {
                     break
                 }
             }
+        }
+
+        // Load saved progress if available
+        if let savedState = loadGameProgress() {
+            // Remove all current boxes
+            for (_, box) in boxNodes {
+                box.removeFromParent()
+            }
+            boxNodes.removeAll()
+
+            // Create boxes at saved positions
+            for boxPos in savedState.boxPositions {
+                let x = boxPos[0]
+                let y = boxPos[1]
+                let position = gridToPosition(x: x, y: y)
+                let box = createTile(at: position, color: .clear, text: "📦", zPosition: 5)
+                addChild(box)
+                boxNodes["\(x),\(y)"] = box
+            }
+
+            // Restore player position and orientation
+            playerGridPosition = (x: savedState.playerX, y: savedState.playerY)
+            let playerPos = gridToPosition(x: savedState.playerX, y: savedState.playerY)
+            playerNode?.position = playerPos
+            playerNode?.zRotation = CGFloat(savedState.playerRotation)
+            playerNode?.xScale = CGFloat(savedState.playerXScale)
         }
     }
 
@@ -451,11 +510,55 @@ class GameScene: SKScene {
         UserDefaults.standard.set(currentCount + 1, forKey: key)
     }
 
+    func saveGameProgress() {
+        // Convert boxNodes to array of positions
+        let boxPositions = boxNodes.keys.compactMap { key -> [Int]? in
+            let components = key.split(separator: ",")
+            guard components.count == 2,
+                  let x = Int(components[0]),
+                  let y = Int(components[1]) else {
+                return nil
+            }
+            return [x, y]
+        }
+
+        let state = PersistentGameState(
+            playerX: playerGridPosition.x,
+            playerY: playerGridPosition.y,
+            playerRotation: Double(playerNode?.zRotation ?? 0),
+            playerXScale: Double(playerNode?.xScale ?? 1),
+            boxPositions: boxPositions
+        )
+
+        // Save to UserDefaults
+        let key = "level_\(currentLevelIndex)_progress"
+        if let encoded = try? JSONEncoder().encode(state) {
+            UserDefaults.standard.set(encoded, forKey: key)
+        }
+    }
+
+    func loadGameProgress() -> PersistentGameState? {
+        let key = "level_\(currentLevelIndex)_progress"
+        guard let data = UserDefaults.standard.data(forKey: key),
+              let state = try? JSONDecoder().decode(PersistentGameState.self, from: data) else {
+            return nil
+        }
+        return state
+    }
+
+    func clearGameProgress(for levelIndex: Int) {
+        let key = "level_\(levelIndex)_progress"
+        UserDefaults.standard.removeObject(forKey: key)
+    }
+
     func checkWinCondition() {
         // Check if all boxes are on targets
         let boxPositions = Set(boxNodes.keys)
 
         if boxPositions == targetPositions {
+            // Clear saved progress for this level
+            clearGameProgress(for: currentLevelIndex)
+
             // Increment completion count for this level
             incrementCompletionCount(for: currentLevelIndex)
 
