@@ -32,6 +32,12 @@ class GameScene: SKScene {
     var nextButton: SKLabelNode?
     var levelTitleLabel: SKLabelNode?
     var completionCountLabel: SKLabelNode?
+    var settingsButton: SKSpriteNode?
+    var closeButton: SKSpriteNode?
+
+    // Control visibility
+    var controlsVisible = true
+    var hideControlsTimer: Timer?
 
     // Auto-navigation
     var autoNavigationPath: [(x: Int, y: Int)] = []
@@ -82,6 +88,9 @@ class GameScene: SKScene {
             name: UIApplication.didEnterBackgroundNotification,
             object: nil
         )
+
+        // Schedule auto-hide of controls after game launch
+        scheduleHideControls()
     }
 
     @objc func appDidEnterBackground() {
@@ -90,6 +99,7 @@ class GameScene: SKScene {
 
     deinit {
         NotificationCenter.default.removeObserver(self)
+        hideControlsTimer?.invalidate()
     }
 
     func loadLevel(at index: Int) {
@@ -110,6 +120,10 @@ class GameScene: SKScene {
 
         setupLevel(allLevels[index])
         setupButtons()
+
+        // Reset visibility state and schedule auto-hide
+        controlsVisible = true
+        scheduleHideControls()
     }
 
     func resetLevel() {
@@ -243,6 +257,91 @@ class GameScene: SKScene {
         return tile
     }
 
+    // MARK: - SF Symbol Helper
+
+    func createSFSymbolSprite(systemName: String, pointSize: CGFloat, color: UIColor = .white) -> SKSpriteNode {
+        let config = UIImage.SymbolConfiguration(pointSize: pointSize, weight: .bold)
+        guard let symbolImage = UIImage(systemName: systemName, withConfiguration: config) else {
+            return SKSpriteNode()
+        }
+
+        // Render the symbol with the specified color using UIGraphicsImageRenderer
+        let renderer = UIGraphicsImageRenderer(size: symbolImage.size)
+        let coloredImage = renderer.image { context in
+            color.setFill()
+            symbolImage.withRenderingMode(.alwaysTemplate).draw(in: CGRect(origin: .zero, size: symbolImage.size))
+            context.cgContext.setBlendMode(.sourceIn)
+            context.cgContext.fill(CGRect(origin: .zero, size: symbolImage.size))
+        }
+
+        let texture = SKTexture(image: coloredImage)
+        let sprite = SKSpriteNode(texture: texture, size: coloredImage.size)
+        return sprite
+    }
+
+    // MARK: - Control Visibility
+
+    func scheduleHideControls() {
+        // Cancel any existing timer
+        hideControlsTimer?.invalidate()
+
+        // Schedule new timer to hide controls after 3 seconds
+        hideControlsTimer = Timer.scheduledTimer(withTimeInterval: 3.0, repeats: false) { [weak self] _ in
+            self?.hideControls()
+        }
+    }
+
+    func hideControls() {
+        guard controlsVisible else { return }
+
+        controlsVisible = false
+
+        // Hide all control buttons and labels
+        let fadeOut = SKAction.fadeOut(withDuration: 0.3)
+        resetButton?.run(fadeOut)
+        undoButton?.run(fadeOut)
+        prevButton?.run(fadeOut)
+        nextButton?.run(fadeOut)
+        levelTitleLabel?.run(fadeOut)
+        completionCountLabel?.run(fadeOut)
+        closeButton?.run(fadeOut)
+
+        // Show settings button
+        settingsButton?.run(SKAction.fadeIn(withDuration: 0.3))
+    }
+
+    func showControls() {
+        guard !controlsVisible else { return }
+
+        controlsVisible = true
+
+        // Show all control buttons and labels
+        let fadeIn = SKAction.fadeIn(withDuration: 0.3)
+        resetButton?.run(fadeIn)
+        undoButton?.run(fadeIn)
+        prevButton?.run(fadeIn)
+        nextButton?.run(fadeIn)
+        levelTitleLabel?.run(fadeIn)
+        completionCountLabel?.run(fadeIn)
+        closeButton?.run(fadeIn)
+
+        // Hide settings button
+        settingsButton?.run(SKAction.fadeOut(withDuration: 0.3))
+    }
+
+    func createSettingsButton() {
+        settingsButton?.removeFromParent()
+
+        // Use SF Symbol (gear icon) - explicitly white
+        settingsButton = createSFSymbolSprite(systemName: "gearshape", pointSize: 36, color: .white)
+        settingsButton?.position = CGPoint(x: 50, y: 50)
+        settingsButton?.name = "settingsButton"
+        settingsButton?.zPosition = 100
+        if let button = settingsButton {
+            addChild(button)
+        }
+    }
+
     func setupButtons() {
         // Remove old buttons if they exist
         resetButton?.removeFromParent()
@@ -251,6 +350,8 @@ class GameScene: SKScene {
         nextButton?.removeFromParent()
         levelTitleLabel?.removeFromParent()
         completionCountLabel?.removeFromParent()
+        closeButton?.removeFromParent()
+        settingsButton?.removeFromParent()
 
         // Position UI at top with safe spacing below dynamic island
         // Dynamic island is about 37pt tall, so start at least 60pt from top
@@ -317,6 +418,19 @@ class GameScene: SKScene {
         nextButton?.name = "nextButton"
         nextButton?.zPosition = 100
         addChild(nextButton!)
+
+        // Close button (lower-left, shown when controls are visible) - explicitly white
+        closeButton = createSFSymbolSprite(systemName: "xmark", pointSize: 36, color: .white)
+        closeButton?.position = CGPoint(x: 50, y: 50)
+        closeButton?.name = "closeButton"
+        closeButton?.zPosition = 100
+        if let button = closeButton {
+            addChild(button)
+        }
+
+        // Initialize settings button as hidden (will be shown when controls hide)
+        createSettingsButton()
+        settingsButton?.alpha = 0
     }
 
     override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
@@ -325,7 +439,13 @@ class GameScene: SKScene {
         let touchedNodes = nodes(at: location)
 
         for node in touchedNodes {
-            if node.name == "undoButton" && !moveHistory.isEmpty {
+            if node.name == "settingsButton" {
+                // Cancel auto-hide timer when user manually shows controls
+                hideControlsTimer?.invalidate()
+                showControls()
+            } else if node.name == "closeButton" {
+                hideControls()
+            } else if node.name == "undoButton" && !moveHistory.isEmpty {
                 undoLastMove()
             } else if node.name == "resetButton" {
                 resetLevel()
@@ -810,6 +930,7 @@ class GameScene: SKScene {
 
         // Save current game state
         let savedState = saveGameState()
+        let wasControlsVisible = controlsVisible
 
         // Update scene size
         size = newSize
@@ -824,6 +945,26 @@ class GameScene: SKScene {
 
         // Restore buttons
         setupButtons()
+
+        // Restore visibility state
+        if !wasControlsVisible {
+            // Re-hide controls without animation
+            controlsVisible = true // Set to true first so hideControls will work
+            resetButton?.alpha = 0
+            undoButton?.alpha = 0
+            prevButton?.alpha = 0
+            nextButton?.alpha = 0
+            levelTitleLabel?.alpha = 0
+            completionCountLabel?.alpha = 0
+            closeButton?.alpha = 0
+            controlsVisible = false
+
+            // Show settings button (already created in setupButtons)
+            settingsButton?.alpha = 1
+        } else {
+            // Controls are visible, so hide settings button
+            settingsButton?.alpha = 0
+        }
     }
 
     func recalculateLayout() {
