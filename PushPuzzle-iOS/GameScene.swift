@@ -42,6 +42,8 @@ class GameScene: SKScene {
         let playerPosition: (x: Int, y: Int)
         let boxFrom: (x: Int, y: Int)?
         let boxTo: (x: Int, y: Int)?
+        let playerRotation: CGFloat
+        let playerXScale: CGFloat
     }
     var moveHistory: [MoveState] = []
 
@@ -315,6 +317,29 @@ class GameScene: SKScene {
         }
     }
 
+    func updatePlayerOrientation(dx: Int, dy: Int) {
+        guard let player = playerNode else { return }
+
+        // Update player rotation based on movement direction
+        if dx > 0 {
+            // Moving right - flip horizontally
+            player.xScale = -1
+            player.zRotation = 0
+        } else if dx < 0 {
+            // Moving left - default orientation
+            player.xScale = 1
+            player.zRotation = 0
+        } else if dy < 0 {
+            // Moving up - rotate -90 degrees
+            player.xScale = 1
+            player.zRotation = -.pi / 2
+        } else if dy > 0 {
+            // Moving down - rotate 90 degrees
+            player.xScale = 1
+            player.zRotation = .pi / 2
+        }
+    }
+
     func movePlayer(dx: Int, dy: Int) {
         guard let level = level else { return }
 
@@ -381,13 +406,18 @@ class GameScene: SKScene {
             }
         }
 
-        // Save state to history (before updating player position)
+        // Save state to history (before updating player position and orientation)
         let moveState = MoveState(
             playerPosition: playerGridPosition,
             boxFrom: boxFromPos,
-            boxTo: boxToPos
+            boxTo: boxToPos,
+            playerRotation: playerNode?.zRotation ?? 0,
+            playerXScale: playerNode?.xScale ?? 1
         )
         moveHistory.append(moveState)
+
+        // Update player orientation based on movement direction
+        updatePlayerOrientation(dx: dx, dy: dy)
 
         // Move player
         let newPlayerPos = gridToPosition(x: newX, y: newY)
@@ -492,10 +522,14 @@ class GameScene: SKScene {
             }
         }
 
-        // Restore player position
+        // Restore player position and orientation
         let oldPlayerPos = gridToPosition(x: lastState.playerPosition.x, y: lastState.playerPosition.y)
         let moveAction = SKAction.move(to: oldPlayerPos, duration: 0.15)
         playerNode?.run(moveAction)
+
+        // Restore player orientation
+        playerNode?.zRotation = lastState.playerRotation
+        playerNode?.xScale = lastState.playerXScale
 
         // Update player position
         playerGridPosition = lastState.playerPosition
@@ -616,6 +650,9 @@ class GameScene: SKScene {
         let nextPos = autoNavigationPath.removeFirst()
         let dx = nextPos.x - playerGridPosition.x
         let dy = nextPos.y - playerGridPosition.y
+
+        // Update player orientation based on movement direction
+        updatePlayerOrientation(dx: dx, dy: dy)
 
         // Move player
         let newPlayerPos = gridToPosition(x: nextPos.x, y: nextPos.y)
