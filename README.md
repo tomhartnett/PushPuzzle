@@ -9,4 +9,4 @@ A [Sokoban](https://en.wikipedia.org/wiki/Sokoban) style puzzle game. Push boxes
 
 This was a vibe-coding experiment. I wanted to try out Claude Code and see how it works. I gave Claude prompts and let it write the code. Then I tested the results. With a few exceptions of minor edits, I did not write the code myself.
 
-<img src="screenshot.png" alt="screenshot of game" width=600>
+<img src="screenshot.png" alt="screenshot of game" width=800>
