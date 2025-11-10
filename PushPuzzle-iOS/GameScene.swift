@@ -32,8 +32,6 @@ class GameScene: SKScene {
     var nextButton: SKLabelNode?
     var levelTitleLabel: SKLabelNode?
     var completionCountLabel: SKLabelNode?
-    var settingsButton: SKSpriteNode?
-    var closeButton: SKSpriteNode?
 
     // Control visibility
     var controlsVisible = true
@@ -257,28 +255,6 @@ class GameScene: SKScene {
         return tile
     }
 
-    // MARK: - SF Symbol Helper
-
-    func createSFSymbolSprite(systemName: String, pointSize: CGFloat, color: UIColor = .white) -> SKSpriteNode {
-        let config = UIImage.SymbolConfiguration(pointSize: pointSize, weight: .bold)
-        guard let symbolImage = UIImage(systemName: systemName, withConfiguration: config) else {
-            return SKSpriteNode()
-        }
-
-        // Render the symbol with the specified color using UIGraphicsImageRenderer
-        let renderer = UIGraphicsImageRenderer(size: symbolImage.size)
-        let coloredImage = renderer.image { context in
-            color.setFill()
-            symbolImage.withRenderingMode(.alwaysTemplate).draw(in: CGRect(origin: .zero, size: symbolImage.size))
-            context.cgContext.setBlendMode(.sourceIn)
-            context.cgContext.fill(CGRect(origin: .zero, size: symbolImage.size))
-        }
-
-        let texture = SKTexture(image: coloredImage)
-        let sprite = SKSpriteNode(texture: texture, size: coloredImage.size)
-        return sprite
-    }
-
     // MARK: - Control Visibility
 
     func scheduleHideControls() {
@@ -295,6 +271,7 @@ class GameScene: SKScene {
         guard controlsVisible else { return }
 
         controlsVisible = false
+        hideControlsTimer?.invalidate()
 
         // Hide all control buttons and labels
         let fadeOut = SKAction.fadeOut(withDuration: 0.3)
@@ -304,10 +281,6 @@ class GameScene: SKScene {
         nextButton?.run(fadeOut)
         levelTitleLabel?.run(fadeOut)
         completionCountLabel?.run(fadeOut)
-        closeButton?.run(fadeOut)
-
-        // Show settings button
-        settingsButton?.run(SKAction.fadeIn(withDuration: 0.3))
     }
 
     func showControls() {
@@ -323,23 +296,9 @@ class GameScene: SKScene {
         nextButton?.run(fadeIn)
         levelTitleLabel?.run(fadeIn)
         completionCountLabel?.run(fadeIn)
-        closeButton?.run(fadeIn)
 
-        // Hide settings button
-        settingsButton?.run(SKAction.fadeOut(withDuration: 0.3))
-    }
-
-    func createSettingsButton() {
-        settingsButton?.removeFromParent()
-
-        // Use SF Symbol (gear icon) - explicitly white
-        settingsButton = createSFSymbolSprite(systemName: "gearshape", pointSize: 36, color: .white)
-        settingsButton?.position = CGPoint(x: 50, y: 50)
-        settingsButton?.name = "settingsButton"
-        settingsButton?.zPosition = 100
-        if let button = settingsButton {
-            addChild(button)
-        }
+        // Schedule auto-hide after showing controls
+        scheduleHideControls()
     }
 
     func setupButtons() {
@@ -350,8 +309,6 @@ class GameScene: SKScene {
         nextButton?.removeFromParent()
         levelTitleLabel?.removeFromParent()
         completionCountLabel?.removeFromParent()
-        closeButton?.removeFromParent()
-        settingsButton?.removeFromParent()
 
         // Position UI at top with safe spacing below dynamic island
         // Dynamic island is about 37pt tall, so start at least 60pt from top
@@ -418,19 +375,6 @@ class GameScene: SKScene {
         nextButton?.name = "nextButton"
         nextButton?.zPosition = 100
         addChild(nextButton!)
-
-        // Close button (lower-left, shown when controls are visible) - explicitly white
-        closeButton = createSFSymbolSprite(systemName: "xmark", pointSize: 36, color: .white)
-        closeButton?.position = CGPoint(x: 50, y: 50)
-        closeButton?.name = "closeButton"
-        closeButton?.zPosition = 100
-        if let button = closeButton {
-            addChild(button)
-        }
-
-        // Initialize settings button as hidden (will be shown when controls hide)
-        createSettingsButton()
-        settingsButton?.alpha = 0
     }
 
     override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
@@ -438,21 +382,30 @@ class GameScene: SKScene {
         let location = touch.location(in: self)
         let touchedNodes = nodes(at: location)
 
+        // Check if a button was tapped
+        var buttonTapped = false
         for node in touchedNodes {
-            if node.name == "settingsButton" {
-                // Cancel auto-hide timer when user manually shows controls
-                hideControlsTimer?.invalidate()
-                showControls()
-            } else if node.name == "closeButton" {
-                hideControls()
-            } else if node.name == "undoButton" && !moveHistory.isEmpty {
+            if node.name == "undoButton" && !moveHistory.isEmpty {
                 undoLastMove()
+                buttonTapped = true
             } else if node.name == "resetButton" {
                 resetLevel()
+                buttonTapped = true
             } else if node.name == "prevButton" && currentLevelIndex > 0 {
                 loadLevel(at: currentLevelIndex - 1)
+                buttonTapped = true
             } else if node.name == "nextButton" && currentLevelIndex < allLevels.count - 1 {
                 loadLevel(at: currentLevelIndex + 1)
+                buttonTapped = true
+            }
+        }
+
+        // If no button was tapped, toggle controls visibility
+        if !buttonTapped {
+            if controlsVisible {
+                hideControls()
+            } else {
+                showControls()
             }
         }
     }
@@ -956,14 +909,7 @@ class GameScene: SKScene {
             nextButton?.alpha = 0
             levelTitleLabel?.alpha = 0
             completionCountLabel?.alpha = 0
-            closeButton?.alpha = 0
             controlsVisible = false
-
-            // Show settings button (already created in setupButtons)
-            settingsButton?.alpha = 1
-        } else {
-            // Controls are visible, so hide settings button
-            settingsButton?.alpha = 0
         }
     }
 
