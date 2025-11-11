@@ -383,34 +383,48 @@ class GameScene: SKScene {
         let touchedNodes = nodes(at: location)
 
         // Check if a button was tapped
-        var buttonTapped = false
         for node in touchedNodes {
             if node.name == "undoButton" && !moveHistory.isEmpty {
                 undoLastMove()
-                buttonTapped = true
             } else if node.name == "resetButton" {
                 resetLevel()
-                buttonTapped = true
             } else if node.name == "prevButton" && currentLevelIndex > 0 {
                 loadLevel(at: currentLevelIndex - 1)
-                buttonTapped = true
             } else if node.name == "nextButton" && currentLevelIndex < allLevels.count - 1 {
                 loadLevel(at: currentLevelIndex + 1)
-                buttonTapped = true
-            }
-        }
-
-        // If no button was tapped, toggle controls visibility
-        if !buttonTapped {
-            if controlsVisible {
-                hideControls()
-            } else {
-                showControls()
             }
         }
     }
 
+    @objc func handleTap(_ gesture: UITapGestureRecognizer) {
+        guard gesture.state == .ended else { return }
+
+        let location = gesture.location(in: gesture.view)
+        guard let view = self.view else { return }
+        let sceneLocation = convertPoint(fromView: location)
+        let touchedNodes = nodes(at: sceneLocation)
+
+        // Don't toggle controls if a button was tapped
+        for node in touchedNodes {
+            if node.name == "undoButton" || node.name == "resetButton" ||
+               node.name == "prevButton" || node.name == "nextButton" {
+                return
+            }
+        }
+
+        // Toggle controls visibility
+        if controlsVisible {
+            hideControls()
+        } else {
+            showControls()
+        }
+    }
+
     func setupGestureRecognizers(view: SKView) {
+        // Tap gesture to toggle controls
+        let tap = UITapGestureRecognizer(target: self, action: #selector(handleTap(_:)))
+        view.addGestureRecognizer(tap)
+
         // Swipe gestures for iOS
         let swipeUp = UISwipeGestureRecognizer(target: self, action: #selector(handleSwipe(_:)))
         swipeUp.direction = .up
@@ -427,6 +441,12 @@ class GameScene: SKScene {
         let swipeRight = UISwipeGestureRecognizer(target: self, action: #selector(handleSwipe(_:)))
         swipeRight.direction = .right
         view.addGestureRecognizer(swipeRight)
+
+        // Make tap gesture not conflict with swipe gestures
+        tap.require(toFail: swipeUp)
+        tap.require(toFail: swipeDown)
+        tap.require(toFail: swipeLeft)
+        tap.require(toFail: swipeRight)
 
         // Long-press gesture for auto-navigation
         let longPress = UILongPressGestureRecognizer(target: self, action: #selector(handleLongPress(_:)))
