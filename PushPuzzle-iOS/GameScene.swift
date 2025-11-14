@@ -33,6 +33,12 @@ class GameScene: SKScene {
     var levelTitleLabel: SKLabelNode?
     var completionCountLabel: SKLabelNode?
 
+    // Button backgrounds
+    var resetButtonBg: SKShapeNode?
+    var undoButtonBg: SKShapeNode?
+    var prevButtonBg: SKShapeNode?
+    var nextButtonBg: SKShapeNode?
+
     // Control visibility
     var controlsVisible = true
     var hideControlsTimer: Timer?
@@ -281,6 +287,12 @@ class GameScene: SKScene {
         nextButton?.run(fadeOut)
         levelTitleLabel?.run(fadeOut)
         completionCountLabel?.run(fadeOut)
+
+        // Hide button backgrounds
+        resetButtonBg?.run(fadeOut)
+        undoButtonBg?.run(fadeOut)
+        prevButtonBg?.run(fadeOut)
+        nextButtonBg?.run(fadeOut)
     }
 
     func showControls() {
@@ -297,6 +309,12 @@ class GameScene: SKScene {
         levelTitleLabel?.run(fadeIn)
         completionCountLabel?.run(fadeIn)
 
+        // Show button backgrounds
+        resetButtonBg?.run(fadeIn)
+        undoButtonBg?.run(fadeIn)
+        prevButtonBg?.run(fadeIn)
+        nextButtonBg?.run(fadeIn)
+
         // Schedule auto-hide after showing controls
         scheduleHideControls()
     }
@@ -309,6 +327,12 @@ class GameScene: SKScene {
         nextButton?.removeFromParent()
         levelTitleLabel?.removeFromParent()
         completionCountLabel?.removeFromParent()
+
+        // Remove old button backgrounds
+        resetButtonBg?.removeFromParent()
+        undoButtonBg?.removeFromParent()
+        prevButtonBg?.removeFromParent()
+        nextButtonBg?.removeFromParent()
 
         // Position UI at top with safe spacing below dynamic island
         // Dynamic island is about 37pt tall, so start at least 60pt from top
@@ -337,42 +361,82 @@ class GameScene: SKScene {
         addChild(completionCountLabel!)
 
         // Undo button (center-left)
+        let undoButtonPos = CGPoint(x: size.width / 2 - 70, y: buttonY)
+        undoButtonBg = SKShapeNode(rectOf: CGSize(width: 80, height: 44), cornerRadius: 8)
+        undoButtonBg?.fillColor = UIColor(white: 0.2, alpha: 0.7)
+        undoButtonBg?.strokeColor = .clear
+        undoButtonBg?.position = undoButtonPos
+        undoButtonBg?.name = "undoButtonBg"
+        undoButtonBg?.zPosition = 99
+        addChild(undoButtonBg!)
+
         undoButton = SKLabelNode(text: "Undo")
         undoButton?.fontSize = 20
         undoButton?.fontName = "Helvetica-Bold"
         undoButton?.fontColor = !moveHistory.isEmpty ? .white : .gray
-        undoButton?.position = CGPoint(x: size.width / 2 - 70, y: buttonY)
+        undoButton?.position = undoButtonPos
         undoButton?.name = "undoButton"
+        undoButton?.verticalAlignmentMode = .center
         undoButton?.zPosition = 100
         addChild(undoButton!)
 
         // Reset button (center-right)
+        let resetButtonPos = CGPoint(x: size.width / 2 + 70, y: buttonY)
+        resetButtonBg = SKShapeNode(rectOf: CGSize(width: 80, height: 44), cornerRadius: 8)
+        resetButtonBg?.fillColor = UIColor(white: 0.2, alpha: 0.7)
+        resetButtonBg?.strokeColor = .clear
+        resetButtonBg?.position = resetButtonPos
+        resetButtonBg?.name = "resetButtonBg"
+        resetButtonBg?.zPosition = 99
+        addChild(resetButtonBg!)
+
         resetButton = SKLabelNode(text: "Reset")
         resetButton?.fontSize = 20
         resetButton?.fontName = "Helvetica-Bold"
         resetButton?.fontColor = .white
-        resetButton?.position = CGPoint(x: size.width / 2 + 70, y: buttonY)
+        resetButton?.position = resetButtonPos
         resetButton?.name = "resetButton"
+        resetButton?.verticalAlignmentMode = .center
         resetButton?.zPosition = 100
         addChild(resetButton!)
 
         // Previous button (left)
+        let prevButtonPos = CGPoint(x: 60, y: buttonY)
+        prevButtonBg = SKShapeNode(rectOf: CGSize(width: 90, height: 44), cornerRadius: 8)
+        prevButtonBg?.fillColor = UIColor(white: 0.2, alpha: 0.7)
+        prevButtonBg?.strokeColor = .clear
+        prevButtonBg?.position = prevButtonPos
+        prevButtonBg?.name = "prevButtonBg"
+        prevButtonBg?.zPosition = 99
+        addChild(prevButtonBg!)
+
         prevButton = SKLabelNode(text: "< Prev")
         prevButton?.fontSize = 20
         prevButton?.fontName = "Helvetica-Bold"
         prevButton?.fontColor = currentLevelIndex > 0 ? .white : .gray
-        prevButton?.position = CGPoint(x: 60, y: buttonY)
+        prevButton?.position = prevButtonPos
         prevButton?.name = "prevButton"
+        prevButton?.verticalAlignmentMode = .center
         prevButton?.zPosition = 100
         addChild(prevButton!)
 
         // Next button (right)
+        let nextButtonPos = CGPoint(x: size.width - 60, y: buttonY)
+        nextButtonBg = SKShapeNode(rectOf: CGSize(width: 90, height: 44), cornerRadius: 8)
+        nextButtonBg?.fillColor = UIColor(white: 0.2, alpha: 0.7)
+        nextButtonBg?.strokeColor = .clear
+        nextButtonBg?.position = nextButtonPos
+        nextButtonBg?.name = "nextButtonBg"
+        nextButtonBg?.zPosition = 99
+        addChild(nextButtonBg!)
+
         nextButton = SKLabelNode(text: "Next >")
         nextButton?.fontSize = 20
         nextButton?.fontName = "Helvetica-Bold"
         nextButton?.fontColor = currentLevelIndex < allLevels.count - 1 ? .white : .gray
-        nextButton?.position = CGPoint(x: size.width - 60, y: buttonY)
+        nextButton?.position = nextButtonPos
         nextButton?.name = "nextButton"
+        nextButton?.verticalAlignmentMode = .center
         nextButton?.zPosition = 100
         addChild(nextButton!)
     }
@@ -384,13 +448,13 @@ class GameScene: SKScene {
 
         // Check if a button was tapped
         for node in touchedNodes {
-            if node.name == "undoButton" && !moveHistory.isEmpty {
+            if (node.name == "undoButton" || node.name == "undoButtonBg") && !moveHistory.isEmpty {
                 undoLastMove()
-            } else if node.name == "resetButton" {
+            } else if node.name == "resetButton" || node.name == "resetButtonBg" {
                 resetLevel()
-            } else if node.name == "prevButton" && currentLevelIndex > 0 {
+            } else if (node.name == "prevButton" || node.name == "prevButtonBg") && currentLevelIndex > 0 {
                 loadLevel(at: currentLevelIndex - 1)
-            } else if node.name == "nextButton" && currentLevelIndex < allLevels.count - 1 {
+            } else if (node.name == "nextButton" || node.name == "nextButtonBg") && currentLevelIndex < allLevels.count - 1 {
                 loadLevel(at: currentLevelIndex + 1)
             }
         }
@@ -406,8 +470,10 @@ class GameScene: SKScene {
 
         // Don't toggle controls if a button was tapped
         for node in touchedNodes {
-            if node.name == "undoButton" || node.name == "resetButton" ||
-               node.name == "prevButton" || node.name == "nextButton" {
+            if node.name == "undoButton" || node.name == "undoButtonBg" ||
+               node.name == "resetButton" || node.name == "resetButtonBg" ||
+               node.name == "prevButton" || node.name == "prevButtonBg" ||
+               node.name == "nextButton" || node.name == "nextButtonBg" {
                 return
             }
         }
@@ -929,6 +995,10 @@ class GameScene: SKScene {
             nextButton?.alpha = 0
             levelTitleLabel?.alpha = 0
             completionCountLabel?.alpha = 0
+            resetButtonBg?.alpha = 0
+            undoButtonBg?.alpha = 0
+            prevButtonBg?.alpha = 0
+            nextButtonBg?.alpha = 0
             controlsVisible = false
         }
     }
