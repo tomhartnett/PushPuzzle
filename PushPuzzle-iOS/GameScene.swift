@@ -722,20 +722,35 @@ class GameScene: SKScene {
             incrementCompletionCount(for: currentLevelIndex)
 
             // Level complete!
+            let messagePos = CGPoint(x: size.width / 2, y: size.height / 2)
+
+            // Create background
+            let background = SKShapeNode(rectOf: CGSize(width: 320, height: 80), cornerRadius: 12)
+            background.fillColor = UIColor(white: 0.1, alpha: 0.85)
+            background.strokeColor = .clear
+            background.position = messagePos
+            background.zPosition = 99
+            addChild(background)
+
+            // Create label
             let label = SKLabelNode(text: "Level Complete!")
             label.fontSize = 48
+            label.fontName = "Helvetica-Bold"
             label.fontColor = .green
-            label.position = CGPoint(x: size.width / 2, y: size.height / 2)
+            label.position = messagePos
+            label.verticalAlignmentMode = .center
             label.zPosition = 100
             addChild(label)
 
             // Fade in effect, then load next level
+            background.alpha = 0
             label.alpha = 0
             let fadeIn = SKAction.fadeIn(withDuration: 0.5)
             let wait = SKAction.wait(forDuration: 1.0)
             let loadNext = SKAction.run { [weak self] in
                 self?.loadNextLevel()
             }
+            background.run(SKAction.sequence([fadeIn, wait, loadNext]))
             label.run(SKAction.sequence([fadeIn, wait, loadNext]))
         }
     }
@@ -746,12 +761,32 @@ class GameScene: SKScene {
             loadLevel(at: nextIndex)
         } else {
             // All levels complete
+            let messagePos = CGPoint(x: size.width / 2, y: size.height / 2)
+
+            // Create background
+            let background = SKShapeNode(rectOf: CGSize(width: 420, height: 80), cornerRadius: 12)
+            background.fillColor = UIColor(white: 0.1, alpha: 0.85)
+            background.strokeColor = .clear
+            background.position = messagePos
+            background.zPosition = 99
+            addChild(background)
+
+            // Create label
             let label = SKLabelNode(text: "All Levels Complete!")
             label.fontSize = 48
+            label.fontName = "Helvetica-Bold"
             label.fontColor = .yellow
-            label.position = CGPoint(x: size.width / 2, y: size.height / 2)
+            label.position = messagePos
+            label.verticalAlignmentMode = .center
             label.zPosition = 100
             addChild(label)
+
+            // Fade in effect
+            background.alpha = 0
+            label.alpha = 0
+            let fadeIn = SKAction.fadeIn(withDuration: 0.5)
+            background.run(fadeIn)
+            label.run(fadeIn)
         }
     }
 
@@ -813,7 +848,58 @@ class GameScene: SKScene {
         if let path = findPath(from: playerGridPosition, to: gridPos) {
             autoNavigationPath = path
             isAutoNavigating = true
+
+            // Show "Moving!" status message in lower-left
+            let label = SKLabelNode(text: "Moving!")
+            label.fontSize = 18
+            label.fontName = "Helvetica-Bold"
+            label.fontColor = .blue
+            label.position = CGPoint(x: 60, y: 40)
+            label.horizontalAlignmentMode = .left
+            label.verticalAlignmentMode = .bottom
+            label.zPosition = 100
+            addChild(label)
+
+            // Fade in effect, wait, then fade out and remove
+            label.alpha = 0
+            let fadeIn = SKAction.fadeIn(withDuration: 0.3)
+            let wait = SKAction.wait(forDuration: 0.5)
+            let fadeOut = SKAction.fadeOut(withDuration: 0.3)
+            let remove = SKAction.removeFromParent()
+            label.run(SKAction.sequence([fadeIn, wait, fadeOut, remove]))
+
             moveAlongPath()
+        } else {
+            // Show "No Route!" error message with background
+            let messagePos = CGPoint(x: size.width / 2, y: size.height / 2)
+
+            // Create background
+            let background = SKShapeNode(rectOf: CGSize(width: 240, height: 80), cornerRadius: 12)
+            background.fillColor = UIColor(white: 0.1, alpha: 0.85)
+            background.strokeColor = .clear
+            background.position = messagePos
+            background.zPosition = 99
+            addChild(background)
+
+            // Create label
+            let label = SKLabelNode(text: "No Route!")
+            label.fontSize = 48
+            label.fontName = "Helvetica-Bold"
+            label.fontColor = .red
+            label.position = messagePos
+            label.verticalAlignmentMode = .center
+            label.zPosition = 100
+            addChild(label)
+
+            // Fade in effect, wait, then fade out and remove both
+            background.alpha = 0
+            label.alpha = 0
+            let fadeIn = SKAction.fadeIn(withDuration: 0.3)
+            let wait = SKAction.wait(forDuration: 1.0)
+            let fadeOut = SKAction.fadeOut(withDuration: 0.3)
+            let remove = SKAction.removeFromParent()
+            background.run(SKAction.sequence([fadeIn, wait, fadeOut, remove]))
+            label.run(SKAction.sequence([fadeIn, wait, fadeOut, remove]))
         }
     }
 
